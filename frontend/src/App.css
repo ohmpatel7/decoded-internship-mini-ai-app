@@ -40,3 +40,14 @@
 .read-the-docs {
   color: #888;
 }
+
+.result-box {
+  background-color: #1e1e1e;  /* dark background */
+  color: #ffffff;             /* white text */
+  padding: 1rem;
+  border-radius: 8px;
+  font-family: monospace;
+  text-align: left;           /* align JSON nicely */
+  white-space: pre-wrap;      /* preserve formatting */
+  word-break: break-word;     /* wrap long lines */
+}
