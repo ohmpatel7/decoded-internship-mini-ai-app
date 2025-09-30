@@ -1,95 +1,205 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import "./App.css";
 
-function App() {
+// helper: copy to clipboard
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="secondary"
+      onClick={() => {
+        navigator.clipboard.writeText(text || "");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      }}
+    >
+      {copied ? "Copied!" : "Copy JSON"}
+    </button>
+  );
+}
+
+export default function App() {
   const [description, setDescription] = useState("");
   const [result, setResult] = useState(null);
+  const [view, setView] = useState("pretty");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    if (!description.trim()) return;
     setLoading(true);
     setResult(null);
+
     try {
-      const res = await fetch("http://localhost:5050/extract", {
+      const res = await fetch("http://localhost:5000/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setResult(data);
-    } catch (err) {
-      setError("Could not reach the backend or AI failed.");
+    } catch {
+      setResult({ error: "Failed to fetch from backend" });
     } finally {
       setLoading(false);
     }
   };
 
+  const parsed = useMemo(() => {
+    if (!result) return null;
+    return {
+      appName: result.appName || "",
+      entities: Array.isArray(result.entities) ? result.entities : [],
+      roles: Array.isArray(result.roles) ? result.roles : [],
+      features: Array.isArray(result.features) ? result.features : [],
+      source: result.source || (result.note ? "fallback" : "ai"),
+    };
+  }, [result]);
+
   return (
-    <div style={{ fontFamily: "Inter, system-ui, Arial", padding: 20, color: "#eee" }}>
-      <h1 style={{ fontSize: 48, marginBottom: 20 }}>Mini AI App – Frontend</h1>
+    <div className="wrapper">
+      <header className="header">
+        <div className="title">Mini AI App – Frontend</div>
+        <div className="subtle">
+          Describe an app in plain English ↦ the AI returns{" "}
+          <b>Entities</b>, <b>Roles</b>, and <b>Features</b>.
+        </div>
+      </header>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={description}
-          placeholder="Enter a system description..."
-          onChange={(e) => setDescription(e.target.value)}
-          style={{
-            width: 360, padding: "10px 12px", borderRadius: 8, marginRight: 12,
-            background: "#222", border: "1px solid #444", color: "#ddd"
-          }}
-        />
-        <button
-          type="submit"
-          disabled={loading || !description.trim()}
-          style={{
-            padding: "10px 16px", borderRadius: 8,
-            background: loading ? "#444" : "#7c4dff",
-            border: "1px solid #9c7bff", color: "#fff", cursor: loading ? "not-allowed" : "pointer"
-          }}
-        >
-          {loading ? "Thinking..." : "Extract Features"}
-        </button>
-      </form>
+      <div className="grid">
+        <section className="card">
+          <form onSubmit={handleSubmit} className="formRow">
+            <input
+              className="input"
+              type="text"
+              placeholder="I want an app where students submit homework and teachers grade it..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <button className="btn" disabled={loading} type="submit">
+              {loading ? "Extracting..." : "Extract Features"}
+            </button>
+          </form>
 
-      <div style={{ marginTop: 24 }}>
-        <h3>Result:</h3>
-        {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+          <div className="tagRow">
+            <span className="tag">OpenAI GPT-4o-mini</span>
+            <span className="tag">Strict JSON</span>
+            <span className="tag">Node + Express API</span>
+            <span className="tag">Vite + React</span>
+          </div>
 
-        {result && (
-          <>
+          <h3 className="sectionTitle">Result:</h3>
+
+          {parsed?.source && (
             <p>
               Source:{" "}
-              {result.source === "ai" ? (
-                <span style={{ color: "limegreen", fontWeight: "bold" }}>AI Generated</span>
+              {parsed.source === "ai" ? (
+                <span className="source">AI Generated</span>
               ) : (
-                <span style={{ color: "orange", fontWeight: "bold" }}>Fallback Demo</span>
+                <span className="warning">Fallback Demo</span>
               )}
             </p>
+          )}
 
-            <pre style={{
-              background: "#1b1b1b", padding: 14, borderRadius: 8,
-              border: "1px solid #333", overflowX: "auto"
-            }}>
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </>
-        )}
+          {result && (
+            <div className="controls">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() =>
+                  setView(view === "pretty" ? "json" : "pretty")
+                }
+              >
+                View: {view === "pretty" ? "Pretty" : "JSON"}
+              </button>
+              <CopyButton text={JSON.stringify(result, null, 2)} />
+            </div>
+          )}
 
-        {!result && !error && (
-          <pre style={{
-            background: "#1b1b1b", padding: 14, borderRadius: 8,
-            border: "1px solid #333", color: "#888"
-          }}>
-            No result yet
-          </pre>
-        )}
+          {view === "json" ? (
+            <div className="jsonWrap">
+              <pre>
+                {result ? JSON.stringify(result, null, 2) : "No result yet"}
+              </pre>
+            </div>
+          ) : (
+            <div className="jsonWrap">
+              {!result && <pre>No result yet</pre>}
+              {parsed && (
+                <>
+                  {parsed.appName && (
+                    <>
+                      <div className="small">App Name</div>
+                      <div style={{ fontSize: 18, marginBottom: 12 }}>
+                        <strong>{parsed.appName}</strong>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="small">Entities</div>
+                  <div className="pillGroup">
+                    {parsed.entities.length ? (
+                      parsed.entities.map((e, i) => (
+                        <div key={`ent-${i}`} className="pill">{e}</div>
+                      ))
+                    ) : (
+                      <span className="subtle">– None –</span>
+                    )}
+                  </div>
+
+                  <div className="small">Roles</div>
+                  <div className="pillGroup">
+                    {parsed.roles.length ? (
+                      parsed.roles.map((r, i) => (
+                        <div key={`role-${i}`} className="pill">{r}</div>
+                      ))
+                    ) : (
+                      <span className="subtle">– None –</span>
+                    )}
+                  </div>
+
+                  <div className="small">Features</div>
+                  <div className="pillGroup">
+                    {parsed.features.length ? (
+                      parsed.features.map((f, i) => (
+                        <div key={`feat-${i}`} className="pill">{f}</div>
+                      ))
+                    ) : (
+                      <span className="subtle">– None –</span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
+        <aside className="card info">
+          <h3>How It Works</h3>
+          <p>
+            The React frontend sends your description to a Node/Express backend,
+            which calls OpenAI <code>gpt-4o-mini</code> with a <b>strict JSON</b> response format.
+            If the API is down, we return a <b>fallback</b> so the UI keeps working.
+          </p>
+          <div className="sep"></div>
+          <h3>Why It’s Useful</h3>
+          <p className="small">
+            • Turn ideas into a structured spec in seconds. <br />
+            • Easy to plug into tools like Jira/Trello. <br />
+            • Reliable demo via fallback mode.
+          </p>
+          <div className="sep"></div>
+          <h3>What’s Next</h3>
+          <p className="small">
+            Export results, save history, add user accounts & collaboration.
+          </p>
+        </aside>
       </div>
+
+      <footer className="footer">
+        © {new Date().getFullYear()} Mini AI App • React, Node & OpenAI
+      </footer>
     </div>
   );
 }
-
-export default App;
